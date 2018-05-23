@@ -32,7 +32,7 @@
   actions:
     change-labels:
       set:
-        cluster: cluster-us-west
+        cluster: cluster-us-east
 
 - kind: rule
   metadata:
