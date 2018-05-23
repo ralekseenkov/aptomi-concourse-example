@@ -1,0 +1,46 @@
+- kind: rule
+  metadata:
+    namespace: platform
+    name: platform_services_deployment_rule
+  weight: 1000
+  actions:
+    change-labels:
+      set:
+        cluster: cluster-us-east
+
+- kind: rule
+  metadata:
+    namespace: social
+    name: realtime_services_deployment_rule
+  weight: 1000
+  criteria:
+    require-all:
+      - message_stream == 'realtime'
+  actions:
+    change-labels:
+      set:
+        cluster: cluster-us-east
+
+- kind: rule
+  metadata:
+    namespace: social
+    name: dev_services_deployment_rule
+  weight: 2000
+  criteria:
+    require-all:
+      - message_stream != 'realtime'
+  actions:
+    change-labels:
+      set:
+        cluster: cluster-us-west
+
+- kind: rule
+  metadata:
+    namespace: system
+    name: reject_dependency_for_mobile_dev_users
+  weight: 1000
+  criteria:
+    require-all:
+      - team == 'mobile-dev'
+  actions:
+    dependency: reject

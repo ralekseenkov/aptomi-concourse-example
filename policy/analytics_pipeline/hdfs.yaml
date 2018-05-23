@@ -1,0 +1,34 @@
+# Definition of HDFS service
+- kind: service
+  metadata:
+    namespace: platform
+    name: hdfs
+
+  components:
+
+    - name: hdfs
+      discovery:
+        url: "hdfs-namenode-{{ .Discovery.Instance }}-0.hdfs-namenode-{{ .Discovery.Instance }}.{{ .Cluster.Namespace }}:8020"
+      code:
+        type: helm
+        params:
+          chartRepo: https://mirantisworkloads.storage.googleapis.com
+          chartName: hdfs
+          chartVersion: 2.3.0
+
+          datanode:
+            replicas: 1
+            antiAffinity: "soft"
+
+# Contract for HDFS
+- kind: contract
+  metadata:
+    namespace: platform
+    name: hdfs
+
+  contexts:
+    # It's a platform service, so we are running it as a single 'platform' instance exposed to everyone
+    - name: platform
+
+      allocation:
+        service: hdfs

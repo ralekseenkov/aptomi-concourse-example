@@ -1,0 +1,29 @@
+# Definition of Analytics Pipeline service
+- kind: service
+  metadata:
+    namespace: platform
+    name: analytics_pipeline
+
+  components:
+
+    - name: kafka
+      contract: kafka
+
+    - name: spark
+      contract: spark
+
+    - name: hdfs
+      contract: hdfs
+
+# Contract for Analytics Pipeline
+- kind: contract
+  metadata:
+    namespace: platform
+    name: analytics_pipeline
+
+  contexts:
+    # It's a platform service, so we are running it as a single 'platform' instance exposed to everyone
+    - name: platform
+
+      allocation:
+        service: analytics_pipeline

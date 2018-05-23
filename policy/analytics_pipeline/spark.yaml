@@ -1,0 +1,50 @@
+# Definition of Spark service
+- kind: service
+  metadata:
+    namespace: platform
+    name: spark
+
+  components:
+
+    - name: zookeeper
+      contract: zookeeper
+
+    - name: spark
+      discovery:
+        url: "spark-master-{{ .Discovery.Instance }}-0.{{ .Cluster.Namespace }}:7077"
+      code:
+        type: helm
+        params:
+          chartRepo: https://mirantisworkloads.storage.googleapis.com
+          chartName: spark
+          chartVersion: 3.0.3
+
+          spark:
+            master:
+              replicas: 1
+            worker:
+              replicas: 1
+              daemonMemory: "2g"
+              executorMemory: "2g"
+
+          zookeeper:
+            deployChart: false
+            addresses:
+              zookeeper: "{{ .Discovery.zookeeper.zookeeper.url }}"
+            path: "/{{ .Discovery.Service.InstanceId }}"
+
+      dependencies:
+        - zookeeper
+
+# Contract for Spark
+- kind: contract
+  metadata:
+    namespace: platform
+    name: spark
+
+  contexts:
+    # It's a platform service, so we are running it as a single 'platform' instance exposed to everyone
+    - name: platform
+
+      allocation:
+        service: spark

@@ -1,0 +1,44 @@
+# Definition of Kafka service
+- kind: service
+  metadata:
+    namespace: platform
+    name: kafka
+
+  components:
+
+    - name: zookeeper
+      contract: zookeeper
+
+    - name: kafka
+      discovery:
+        url: "kafka-{{ .Discovery.Instance }}-0.kafka-{{ .Discovery.Instance }}.{{ .Cluster.Namespace }}:9092"
+      code:
+        type: helm
+        params:
+          chartRepo: https://mirantisworkloads.storage.googleapis.com
+          chartName: kafka
+          chartVersion: 1.6.0
+
+          replicas: 1
+          antiAffinity: "soft"
+
+          zookeeper:
+            deployChart: false
+            addresses:
+              zookeeper: "{{ .Discovery.zookeeper.zookeeper.url }}"
+
+      dependencies:
+        - zookeeper
+
+# Contract for Kafka
+- kind: contract
+  metadata:
+    namespace: platform
+    name: kafka
+
+  contexts:
+    # It's a platform service, so we are running it as a single 'platform' instance exposed to everyone
+    - name: platform
+
+      allocation:
+        service: kafka

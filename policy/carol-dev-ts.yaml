@@ -1,0 +1,9 @@
+- kind: dependency
+  metadata:
+    namespace: social
+    name: carol_dev
+  user: Carol
+  contract: twitter_stats
+  labels:
+    # Version of visualization code (container image tag)
+    tsvisimage: demo11

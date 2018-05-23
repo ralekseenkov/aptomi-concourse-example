@@ -1,0 +1,127 @@
+# Definition of Twitter Stats service
+- kind: service
+  metadata:
+    namespace: social
+    name: twitter_stats
+
+  components:
+
+    - name: analytics_pipeline
+      contract: platform/analytics_pipeline
+
+    # Publisher (Twitter Streaming API -> kafka)
+    - name: tweepub
+      code:
+        type: helm
+        params:
+          chartRepo: https://mirantisworkloads.storage.googleapis.com
+          chartName: "{{ if eq .Labels.message_stream \"realtime\" }}tweepub{{ else }}tweepub-fake{{ end }}"
+
+          # Pass labels to publisher application
+          twitter:
+            baseWord: "{{ default .Labels.message_stream }}"
+            appKey: "{{ default .Labels.appKey }}"
+            appSecret: "{{ default .Labels.appSecret }}"
+            tokenKey: "{{ default .Labels.tokenKey }}"
+            tokenSecret: "{{ default .Labels.tokenSecret }}"
+            locations: "{{ default .Labels.locations }}"
+
+          # Tell publisher where to put messages (kafka connection url & topic)
+          kafka:
+            deployChart: false
+            addresses:
+              kafka: "{{ .Discovery.analytics_pipeline.kafka.kafka.url }}"
+            topic: "tweepub-{{ .Discovery.Service.InstanceId }}"
+
+      dependencies:
+        - analytics_pipeline
+
+    # Spark job (takes tweets -> does hashtags stats -> puts stats into hdfs)
+    - name: tweetics
+      code:
+        type: helm
+        params:
+          chartRepo: https://mirantisworkloads.storage.googleapis.com
+          chartName: tweetics
+
+          zookeeper:
+            addresses:
+              zookeeper: "{{ .Discovery.analytics_pipeline.kafka.zookeeper.zookeeper.url }}"
+
+          kafka:
+            addresses:
+              kafka:  "{{ .Discovery.analytics_pipeline.kafka.kafka.url }}"
+            topic: "tweepub-{{ .Discovery.Service.InstanceId }}"
+
+          spark:
+            deployChart: false
+            addresses:
+              spark: "{{ .Discovery.analytics_pipeline.spark.spark.url }}"
+            batchDuration: 5
+
+          hdfs:
+            addresses:
+              namenode: "{{ .Discovery.analytics_pipeline.hdfs.hdfs.url }}"
+            path: "/twitter-{{ .Discovery.Service.InstanceId }}/results"
+      dependencies:
+        - analytics_pipeline
+
+    # Visualizer (takes stats from hdfs and shows on web page)
+    - name: tweeviz
+      code:
+        type: helm
+        params:
+          chartRepo: https://mirantisworkloads.storage.googleapis.com
+          chartName: tweeviz
+
+          image:
+            repository: aptomi/
+            name: tweeviz
+            tag: "v1.2.0-{{ .Labels.tsvisimage }}"
+
+          topListSize: 10
+
+          header: "Twitter Stats {{ .User.Name }} ({{ .Discovery.Instance }})"
+
+          hdfs:
+            addresses:
+              namenode: "{{ .Discovery.analytics_pipeline.hdfs.hdfs.url }}"
+            path: "/twitter-{{ .Discovery.Service.InstanceId }}"
+
+      dependencies:
+        - analytics_pipeline
+
+# Contract for Twitter Stats
+- kind: contract
+  metadata:
+    namespace: social
+    name: twitter_stats
+
+  contexts:
+    # Twitter Stats 'realtime' implementation:
+    # - receives messages from Twitter Streaming API
+    # - picked when condition org == 'it' is met
+    - name: realtime
+      criteria:
+        require-all:
+          - org == 'it'
+      change-labels:
+        set:
+          message_stream: 'realtime'
+      allocation:
+        service: twitter_stats
+
+    # Twitter Stats 'dev' implementation:
+    # - generates a constant stream of test messages (without connecting to Twitter Streaming API)
+    # - picked when condition org == 'dev'
+    - name: dev
+      criteria:
+        require-all:
+          - org == 'dev'
+      change-labels:
+        set:
+          message_stream: 'development'
+      allocation:
+        service: twitter_stats
+        keys:
+          - "{{ .User.Name }}"
